@@ -1,0 +1,74 @@
+risk-sent/
+├── mcp-server/             # TIER 1: The Tool Layer (Isolated)
+│   ├── server.py           # FastMCP implementation
+│   └── tools/              # Specialized risk math tools
+|
+├── backend/                # FastAPI Application
+│   ├── app/                # Main logic
+│   │   ├── __init__.py
+│   │   ├── api/            # Route handlers (Endpoints)
+│   │   │   ├── v1/         # Versioning your API
+│   │   │   │   ├── api.py  # Main router
+│   │   │   │   └── endpoints/
+│   │   │       │   ├── upload.py  # Handle PDF uploads
+│   │   │       │   └── chat.py    # Handle AI queries
+│   │   ├── core/           # Configuration & Security
+│   │   │   ├── config.py   # Pydantic settings (reads .env)
+│   │   │   └── security.py 
+│   │   ├── services/       # Business Logic (The "Brain")
+│   │   │   ├── ai_service.py   # RAG & LLM logic
+│   │   │   └── file_service.py # PDF processing logic
+│   │   ├── models/         # Database/Data schemas (Pydantic)
+│   │   │   └── chat.py     # Request/Response shapes
+│   │   └── main.py         # App entry point
+│   ├── tests/              # SDET Focus: Automated Tests
+│   │   ├── __init__.py
+│   │   ├── test_api.py     # Integration tests
+│   │   └── test_engine.py  # LLM/RAG accuracy tests
+│   ├── data/               # Local storage for FAISS indices & Uploads
+│   │   ├── uploads/
+│   │   └── vector_store/
+│   ├── .env                # Secret keys (HuggingFace/Gemini)
+│   ├── .gitignore          # Files to ignore (venv, __pycache__)
+│   └── requirements.txt    # Python dependencies
+│
+├── frontend/               # React Application (Sprint 3)
+│   ├── public/
+│   ├── src/
+│   │   ├── components/     # UI Components (Buttons, Chatbox)
+│   │   ├── hooks/          # Custom API logic
+│   │   └── App.js
+│   ├── package.json
+│   └── tailwind.config.js
+│
+└── README.md               # Documentation
+
+
+risk-sent/
+├── mcp-server/             # TIER 1: The Tool Layer (Isolated)
+│   ├── server.py           # FastMCP implementation
+│   └── tools/              # Specialized risk math tools
+│
+├── backend/                # TIER 2: The Orchestration & RAG Layer
+│   ├── app/
+│   │   ├── core/           # Pydantic Settings & Logging
+│   │   ├── services/
+│   │   │   ├── rag_service.py    # Parent-Document RAG logic
+│   │   │   └── agent_service.py  # LangGraph Agent (Connects RAG + MCP)
+│   │   ├── api/            # FastAPI Routes
+│   │   └── main.py
+│   ├── data/               # Vector Store & PDF storage
+│   └── .env
+│
+├── tests/                  # TIER 3: The SDET Layer (Your Specialty)
+│   ├── conftest.py         # Pytest fixtures
+│   ├── integration/        # API & MCP connection tests
+│   └── evaluation/         # AI Accuracy tests (Ragas/Fact-checking)
+│
+└── frontend/               # TIER 4: The UI (React + Tailwind)
+
+
+
+
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main

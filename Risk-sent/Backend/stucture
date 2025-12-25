@@ -1,0 +1,48 @@
+project/
+├── app/
+│   ├── main.py
+│   ├── core/
+│   │   ├── config.py
+│   │   ├── security.py
+│   │   └── logging.py
+│   │
+│   ├── api/
+│   │   ├── v1/
+│   │   │   ├── router.py
+│   │   │   └── routes/
+│   │   │       ├── auth.py
+│   │   │       └── users.py
+│   │
+│   ├── schemas/
+│   │   ├── auth_schema.py
+│   │   └── user_schema.py
+│   │
+│   ├── models/
+│   │   └── user_model.py
+│   │
+│   ├── repositories/
+│   │   └── user_repository.py
+│   │
+│   ├── services/
+│   │   └── user_service.py
+│   │
+│   ├── db/
+│   │   ├── client.py
+│   │   └── init_db.py
+│   │
+│   ├── dependencies/
+│   │   └── auth.py
+│   │
+│   ├── utils/
+│   │   └── helpers.py
+│   │
+│   ├── middleware/
+│   │   └── request_logger.py
+│   │
+│   └── tests/
+│       └── test_users.py
+│
+├── .env
+├── requirements.txt
+├── Dockerfile
+└── README.md

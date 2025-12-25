@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+pydantic-settings
+python-dotenv
+langchain-huggingface
+langchain-community
+sentence-transformers
+faiss-cpu
+pypdf
