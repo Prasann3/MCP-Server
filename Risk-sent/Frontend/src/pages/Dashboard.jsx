@@ -9,7 +9,9 @@ import { Button } from '@/components/ui/button';
 
 export default function Dashboard() {
   const [input, setInput] = useState('');
-  const { messages, currentStep, isProcessing, sendMessage } = useChatStream('http://localhost:8000/chat');
+  const [chats , setChats] = useState([]);
+  const [currentChat , setCurrentChat] = useState(null);
+  const { messages, currentStep, isProcessing, sendMessage ,setMessages } = useChatStream();
   const { user, signOut } = useAuth();
   const scrollRef = useRef(null);
   
@@ -19,9 +21,21 @@ export default function Dashboard() {
     }
   }, [messages, isProcessing]);
 
+  useEffect(() => {
+    async function getMyChats() {
+      const res = await fetch("http://127.0.0.1:8000/api/v1/users/mychat" , {
+            credentials : "include"
+      })
+      const data = await res.json()
+      console.log(data);
+      setChats(data.chats)
+    }
+    getMyChats()
+  } , [user])
+
   const handleSend = () => {
     if (!input.trim() || isProcessing) return;
-    sendMessage(input, setInput);
+    sendMessage(input , currentChat , setChats , setCurrentChat);
     setInput('');
   };
 
@@ -29,10 +43,22 @@ export default function Dashboard() {
     await signOut();
   };
 
+  const handleChangeOfChat = (chatId) => {
+    async function callBackend() {
+       const res = await fetch(`http://127.0.0.1:8000/api/v1/chats/${chatId}` , {
+           credentials: "include"
+       })
+       const chatObject = await res.json();
+       setCurrentChat(chatId)
+       setMessages(chatObject.messages)
+    }
+    callBackend();
+  }
+
   return (
-    <div className="flex h-screen bg-background text-foreground overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-72 bg-sidebar flex flex-col border-r border-sidebar-border">
+    <div className="flex h-screen min-h-0 bg-background text-foreground">
+      {/* Sidebar: add min-h-0 so children can overflow inside flex column */}
+      <aside className="w-72 bg-sidebar flex flex-col border-r border-sidebar-border min-h-0">
         <div className="p-6 flex items-center gap-3 border-b border-sidebar-border">
           <div className="bg-primary p-2 rounded-lg shadow-lg animate-pulse-glow">
             <ShieldAlert className="text-primary-foreground" size={20} />
@@ -41,20 +67,45 @@ export default function Dashboard() {
             RiskSense <span className="text-gradient">Pro</span>
           </span>
         </div>
-        
-        <div className="p-4 flex-1 space-y-4 mt-4">
+
+        {/* Make this wrapper a column with min-h-0 so its flex-1 child can scroll */}
+        <div className="p-4 flex flex-col flex-1 mt-4 min-h-0">
           <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-2 mb-4">
             Intelligence Feed
           </div>
-          <button className="w-full flex items-center gap-3 px-3 py-2 rounded-xl bg-secondary text-secondary-foreground text-sm border border-border hover:border-primary/50 transition-colors">
-            <FileText size={16} className="text-primary" /> 2024 10-K Report
-          </button>
-          
-          <Link to="/upload" className="block">
-            <Button variant="outline" className="w-full justify-start gap-2">
-              <Upload size={16} /> Upload Documents
-            </Button>
-          </Link>
+
+          {/* Scrollable list container: flex-1 + overflow-y-auto */}
+          <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+            {chats.length === 0 && (
+              <div className="text-sm text-muted-foreground px-2">No chats yet</div>
+            )}
+
+            {[...chats].reverse().map((chat, index) => (
+              <button
+                key={chat._id ?? index}
+                onClick={() => handleChangeOfChat(chat._id)}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl bg-secondary text-secondary-foreground text-sm border border-border hover:border-primary/50 transition-colors"
+              >
+                <FileText size={16} className="text-primary" /> {chat.title}
+              </button>
+            ))}
+
+          </div>
+            <button
+              onClick={() => { setCurrentChat(null); setMessages([]); }}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-xl bg-secondary text-secondary-foreground text-sm border border-border hover:border-primary/50 transition-colors"
+            >
+              <FileText size={16} className="text-primary" /> New Chat
+            </button>
+
+          {/* Upload button stays below the scrollable list */}
+          <div className="mt-3">
+            <Link to="/upload" className="block">
+              <Button variant="outline" className="w-full justify-start gap-2">
+                <Upload size={16} /> Upload Documents
+              </Button>
+            </Link>
+          </div>
         </div>
 
         <div className="p-4 border-t border-sidebar-border">

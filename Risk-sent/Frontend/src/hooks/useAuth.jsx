@@ -1,3 +1,4 @@
+import { dataTagErrorSymbol } from '@tanstack/react-query';
 import { useState, useEffect, createContext, useContext } from 'react';
 
 const AuthContext = createContext(null);
@@ -18,43 +19,68 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
-  const signUp = async (email, password, fullName) => {
+  const signUp = async (email, password, full_name) => {
     // TODO: Replace with your backend API call
-    // Example: const response = await fetch('/api/auth/signup', { method: 'POST', body: JSON.stringify({ email, password, fullName }) });
+    // Example: const response = await fetch('/api/auth/signup', { method: 'POST', body: JSON.stringify({ email, password, full_name }) });
     
-    const mockUser = {
-      id: crypto.randomUUID(),
-      email,
-      fullName,
-      createdAt: new Date().toISOString(),
-    };
-    
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(mockUser));
-    setUser(mockUser);
-    return { user: mockUser, error: null };
+      const res = await fetch("http://127.0.0.1:8000/api/v1/users/" , {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email,
+          password ,
+          full_name
+        })
+      })
+
+      const data = await res.json()      
+      const user = {
+         "full_name" : data.full_name ,
+         "email" : data.email
+      }
+    setUser(user)
+    return { user , error: null };
   };
 
   const signIn = async (email, password) => {
-    // TODO: Replace with your backend API call
-    // Example: const response = await fetch('/api/auth/signin', { method: 'POST', body: JSON.stringify({ email, password }) });
-    
-    const mockUser = {
-      id: crypto.randomUUID(),
-      email,
-      fullName: email.split('@')[0],
-      createdAt: new Date().toISOString(),
-    };
-    
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(mockUser));
-    setUser(mockUser);
-    return { user: mockUser, error: null };
+
+    try {
+      const res = await fetch("http://127.0.0.1:8000/api/v1/users/login" , {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        credentials : "include"
+        ,
+        body: JSON.stringify({
+          email,
+          password ,
+        })
+      })
+      if (!res.ok) {
+        const errorBody = await res.json().catch(() => null);
+        throw new Error(errorBody?.detail || `HTTP ${res.status}`);
+      }
+      
+      const data = await res.json()      
+      const user = {
+        "full_name" : data.full_name ,
+        "email" : data.email
+      }
+      setUser(user)
+      return { user , error: null };
+    }
+    catch(err) {
+         return {error : err}
+    }
+
   };
 
   const signOut = async () => {
     // TODO: Replace with your backend API call
     // Example: await fetch('/api/auth/signout', { method: 'POST' });
-    
-    localStorage.removeItem(STORAGE_KEY);
     setUser(null);
   };
 

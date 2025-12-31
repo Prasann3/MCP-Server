@@ -14,7 +14,7 @@ export default function Auth() {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    fullName: ''
+    full_name: ''
   });
 
   const { signIn, signUp } = useAuth();
@@ -27,12 +27,14 @@ export default function Auth() {
 
     try {
       if (isLogin) {
-        const { error } = await signIn(formData.email, formData.password);
+        const {user , error } = await signIn(formData.email, formData.password);
         if (error) throw error;
+        if(user) {
         toast({ title: 'Welcome back!', description: 'Successfully signed in.' });
         navigate('/dashboard');
+        }
       } else {
-        const { error } = await signUp(formData.email, formData.password, formData.fullName);
+        const { error } = await signUp(formData.email, formData.password, formData.full_name);
         if (error) throw error;
         toast({ title: 'Account created!', description: 'You can now sign in.' });
         navigate('/dashboard');
@@ -75,15 +77,15 @@ export default function Auth() {
           <form onSubmit={handleSubmit} className="space-y-6">
             {!isLogin && (
               <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
+                <Label htmlFor="full_name">Full Name</Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
                   <Input
-                    id="fullName"
+                    id="full_name"
                     type="text"
                     placeholder="John Doe"
-                    value={formData.fullName}
-                    onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                    value={formData.full_name}
+                    onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
                     className="pl-10"
                     required={!isLogin}
                   />

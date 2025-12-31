@@ -12,7 +12,6 @@ router = APIRouter()
 @router.post("/", response_model=ChatOut)
 async def create_new_chat(payload: ChatCreate, user_id: str = Depends(get_current_user)):
     created = await create_chat(user_id, payload)
-    created["_id"] = str(created["_id"])
     return created
 
 
@@ -63,9 +62,12 @@ async def remove_chat(chat_id: str, user_id: str = Depends(get_current_user)):
 async def post_message(chat_id: str, message: Message , user_id: str = Depends(get_current_user)):
     chat = await get_chat_by_id(chat_id)
     if not chat:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
+      raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
+    chat_id = chat["_id"]
+
     if str(chat.get("user_id")) != str(user_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+
     updated = await add_message(chat_id, message)
    
     if not updated:

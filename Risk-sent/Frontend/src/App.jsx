@@ -11,6 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import Upload from "./pages/Upload";
 import NotFound from "./pages/NotFound";
 
+
 const queryClient = new QueryClient();
 
 const App = () => (

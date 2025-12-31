@@ -3,6 +3,9 @@ from app.schemas.user_schema import UserCreate, UserOut, UserUpdate, Token
 from app.services.user_service import create_user, authenticate_user, get_user_by_id, list_users, update_user, delete_user
 from app.core.auth import create_access_token, get_current_user
 from typing import List
+from app.core.logging import logger
+from app.db.client import mongo_client
+from bson import ObjectId
 
 router = APIRouter()
 
@@ -14,10 +17,11 @@ async def register_user(data: UserCreate):
         created["_id"] = str(created["_id"])
         return created
     except ValueError as e:
+        logger.error(e.with_traceback())
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.post("/login", response_model=Token)
+@router.post("/login")
 async def login_user(response: Response, data: UserCreate):
     # re-using UserCreate for simple email + password payload
     user = await authenticate_user(data.email, data.password)
@@ -25,14 +29,25 @@ async def login_user(response: Response, data: UserCreate):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     token = create_access_token(str(user.get("_id")))
     # set cookie — in production set secure=True and samesite properly
-    response.set_cookie(key="access_token", value=token, httponly=True, samesite="Lax")
-    return {"access_token": token, "token_type": "bearer"}
+    response.set_cookie(key="token", value=token, httponly=True, samesite="none" , secure=True ,  path="/" , max_age=60*60*24)
+    return {"full_name" : user["full_name"] , "email" : user["email"]}
 
 
 @router.post("/logout")
 async def logout(response: Response):
-    response.delete_cookie("access_token")
+    response.delete_cookie("token")
     return {"ok": True}
+
+@router.get("/mychat")
+async def get_my_chats(user_id : str = Depends(get_current_user)) :
+    cursor = mongo_client.db.chats.find(
+        {"user_id": user_id}
+    )
+    chats = await cursor.to_list(length=None)
+    for chat in chats:
+     chat["_id"] = str(chat["_id"])
+    doc = {'status' : "success" , 'chats' : chats}
+    return doc
 
 
 @router.get("/me", response_model=UserOut)

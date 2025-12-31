@@ -37,14 +37,13 @@ class UserInDB(UserBase):
 
 
 class UserOut(BaseModel):
-    id: PyObjectId = Field(alias="_id")
+    id: str = Field(alias="_id")
     email: EmailStr
     full_name: str | None = None
 
     model_config = {
         "populate_by_name": True,
         "validate_by_name": True,
-        "json_encoders": {ObjectId: str},
     }
 
 class Token(BaseModel):

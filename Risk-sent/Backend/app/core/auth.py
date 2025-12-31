@@ -31,7 +31,7 @@ def verify_token(token: str) -> str:
 
 async def get_current_user(request: Request) -> str:
     # We expect access token inside cookies under key "access_token"
-    token = request.cookies.get("access_token")
+    token = request.cookies.get("token")
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     subject = verify_token(token)

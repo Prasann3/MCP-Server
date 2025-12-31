@@ -16,6 +16,7 @@ async def create_chat(user_id: str, payload: ChatCreate) -> dict:
     }
     res = await chats.insert_one(doc)
     created = await chats.find_one({"_id": res.inserted_id})
+    created["_id"] = str(created["_id"])
     return created
 
 

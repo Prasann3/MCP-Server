@@ -1,32 +1,46 @@
 import { useState } from 'react';
 
-export const useChatStream = (url) => {
+export const useChatStream = () => {
   const [messages, setMessages] = useState([]);
   const [currentStep, setCurrentStep] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
 
-  const sendMessage = async (input, setInput) => {
+  const sendMessage = async (input , currentChatId , setChats , setCurrentChat) => {
     setIsProcessing(true);
     setCurrentStep(1);
     setError(null);
     
     if (!input.trim()) return;
-
+    
     const userMsg = { role: 'user', content: input };
     const aiMsgId = Date.now();
     
     setMessages(prev => [...prev, userMsg, { id: aiMsgId, role: 'assistant', content: '' }]);
-    setInput('');
     setIsProcessing(true);
-
+    let fetchChat = false , chatObject
+    
     try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: input })
-      });
+      if(!currentChatId) {
+             const res = await fetch(`http://127.0.0.1:8000/api/v1/chats/` , {
+                    method : 'POST' ,
+                    credentials : "include" ,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title : null , summary: null })
+             })
+             const data = await res.json();             
+             currentChatId = data._id
+             fetchChat = true;
+      }
 
+      const response = await fetch(`http://127.0.0.1:8000/api/v1/chats/${currentChatId}/messages`, {
+        method: 'POST',
+        credentials : "include",
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role : "user" , content: input })
+      });
+     
+     
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let tokenQueue = "";
@@ -71,6 +85,17 @@ export const useChatStream = (url) => {
           }
         });
       }
+      if(fetchChat) {
+        const res = await fetch(`http://127.0.0.1:8000/api/v1/chats/${currentChatId}` , {
+          method : 'GET' ,
+          credentials : "include"
+        })
+        chatObject = await res.json()
+        console.log(chatObject.title);
+        setChats(prev => [...prev , chatObject])
+      }
+      setCurrentChat(currentChatId);
+
     } catch (err) {
       setError(err.message);
       setIsProcessing(false);

@@ -12,6 +12,7 @@ async def create_user(user: UserCreate) -> dict:
         raise ValueError("User with that email already exists")
     hashed = hash_password(user.password)
     doc = {"email": user.email, "full_name": user.full_name, "hashed_password": hashed}
+    print(doc["full_name"])
     res = await users.insert_one(doc)
     created = await users.find_one({"_id": res.inserted_id})
     return created

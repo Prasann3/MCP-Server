@@ -131,6 +131,7 @@ class RiskAgentManager:
             #Check if messages multiple of 5 for resummerization
             count = await get_message_size(chat_id)
             summary = None
+            print(title , summary)
             if count % 10 == 0 :
                 current_summary = chat["summary"]
                 if not current_summary : current_summary = ""
