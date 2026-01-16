@@ -1,6 +1,6 @@
 import logging
 from app.core.logging import logger
-import os
+from app.utils.uploads import wrap_tool_with_context
 from langchain_groq import ChatGroq
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.prebuilt import create_react_agent
@@ -34,11 +34,9 @@ class RiskAgentManager:
         self.cached_tools = None
         self.agent = None
 
-    async def get_agent(self):
+    async def get_agent(self , doc_id=None):
         # MCP tools
         logger.info("Collecting MCP Tools")
-        if self.agent : 
-            return self.agent
         mcp_tools = None
         if not self.cached_tools :
          mcp_tools = await self.mcp_client.get_tools()
@@ -46,16 +44,27 @@ class RiskAgentManager:
         else :
             mcp_tools = self.cached_tools 
         
-        # We pass the LLM directly and the tools. 
+        if doc_id :
+         contextual_tools = [
+         wrap_tool_with_context(t, doc_id) if t.name == "search_10k_risks" else t 
+         for t in mcp_tools
+         ] 
+
+        else :
+
+          contextual_tools = [
+            t for t in mcp_tools if t.name != "search_10k_risks"
+          ]  
+
     
         self.agent = create_react_agent(
             self.llm, 
-            tools=mcp_tools
+            tools=contextual_tools
         )
         return self.agent
 
 
-    async def run_query(self, user_input: str, chat):
+    async def run_query(self, user_input: str, chat , doc_id = None):
         """
         An async generator that yields status updates and 
         eventually the final answer, utilizing Long-term and Short-term memory.
@@ -77,13 +86,13 @@ class RiskAgentManager:
             # Step 3: MCP Handshake
             yield json.dumps({"status": "Connecting to MCP", "step": 2}) + "\n"
             logger.info("Getting info about the tools")
-            agent = await self.get_agent()
+            agent = await self.get_agent(doc_id)
 
             # Step 4: Context-Aware System Prompt
             # Merging your tool constraints with the Contextual Hierarchy logic
             strict_system_prompt = f"""
             ### ROLE
-            You are a Financial Risk Analyst. You must provide professional, accurate answers using the 'search_10k_risks' tool.
+            You are a Financial Risk Analyst. You must provide professional, accurate answers using the provided tool.
 
             ### CONTEXTUAL HIERARCHY
             1. [LONG-TERM SUMMARY]: {long_term_summary}
@@ -91,13 +100,15 @@ class RiskAgentManager:
 
             ### OPERATIONAL LOGIC
             - **Relevance Check**: Determine if the current query relates to the memory above. If it does, use that context (e.g., resolve who 'they' or 'this company' refers to).
-            - **Tool Usage**: You MUST use the <function=search_10k_risks> tool for any data-heavy requests.
+            - **Tool Usage**: You MUST use the tools provided to you for any data-heavy requests.
             - **Tone**: Do not leak internal details or mention that you were provided info by a tool. 
-            - **Scope**: If you cannot answer, say: "This is beyond my scope, sorry!!."
+            -**Behaviour**: You must assisst the user in every way possible to get the best possible answer. Try to answer every question possible
+            - **Scope**: Do not mention what internally you are doing to answer the query , just answer the query as best as you can."
 
             ### FORMATTING
-            You must format your tool call EXACTLY like this:
-            <function=search_10k_risks>{{"query": "your search terms"}}</function>
+            You must format your tool call EXACTLY like this: 
+            <function=tool_name>{{"parameters": "parameters"}}</function>
+            **Important**: Call only the tools provided to you , if you cant answer the query using the tools provided to you , then say that you cant answer the query.
             """
 
             yield json.dumps({"status": "Searching 10-K", "step": 3}) + "\n"
@@ -116,6 +127,9 @@ class RiskAgentManager:
             # Invoke the agent (LangGraph/LangChain)
             result = await agent.ainvoke(inputs)
             final_answer = result["messages"][-1].content
+            
+            for messages in result["messages"] :
+                print(messages)
 
             # Step 6: Save Assistant Response
             llm_message = Message(
@@ -155,6 +169,7 @@ class RiskAgentManager:
         except Exception as e:
             logging.error(f"Error occurred while processing the request: {str(e)}")
             yield json.dumps({"status": "Error", "step": 5, "error": str(e)}) + "\n"
+            raise e
 
     async def summarize_messages(self , summary : str, messages : list[Message]) -> str : 
           

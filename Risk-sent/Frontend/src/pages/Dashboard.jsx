@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ShieldAlert, FileText, Send, User, Bot, Copy, ThumbsUp, Upload, LogOut } from 'lucide-react';
 import StatusStepper from '@/components/StatusStepper';
 import { useChatStream } from '@/hooks/useChatStream';
+import { useUploadedDocuments } from '../hooks/useUploadedDocuments.jsx';
 import { useAuth } from '@/hooks/useAuth';
 import { formatGeminiText } from './../lib/utils.jsx';
 import { Button } from '@/components/ui/button';
@@ -11,9 +12,12 @@ export default function Dashboard() {
   const [input, setInput] = useState('');
   const [chats , setChats] = useState([]);
   const [currentChat , setCurrentChat] = useState(null);
+  const [showDropdown , setShowDropdown] = useState(false);
   const { messages, currentStep, isProcessing, sendMessage ,setMessages } = useChatStream();
   const { user, signOut } = useAuth();
   const scrollRef = useRef(null);
+  let {documents , setDocuments , currentDocument , setCurrentDocument , fetchDocuments , pollerRef} = useUploadedDocuments()
+  console.log(documents);
   
   useEffect(() => {
     if (scrollRef.current) {
@@ -33,9 +37,19 @@ export default function Dashboard() {
     getMyChats()
   } , [user])
 
+  useEffect(() => {
+       fetchDocuments()
+       return () => {
+         console.log("Hey");
+         
+         clearInterval(pollerRef.current)
+         pollerRef.current = null;
+       }
+  } , [])
+
   const handleSend = () => {
     if (!input.trim() || isProcessing) return;
-    sendMessage(input , currentChat , setChats , setCurrentChat);
+    sendMessage(input , currentChat , setChats , setCurrentChat , (currentDocument ? currentDocument.id : null));
     setInput('');
   };
 
@@ -57,7 +71,8 @@ export default function Dashboard() {
 
   return (
     <div className="flex h-screen min-h-0 bg-background text-foreground">
-      {/* Sidebar: add min-h-0 so children can overflow inside flex column */}
+
+      {/* Sidebar */}
       <aside className="w-72 bg-sidebar flex flex-col border-r border-sidebar-border min-h-0">
         <div className="p-6 flex items-center gap-3 border-b border-sidebar-border">
           <div className="bg-primary p-2 rounded-lg shadow-lg animate-pulse-glow">
@@ -68,41 +83,50 @@ export default function Dashboard() {
           </span>
         </div>
 
-        {/* Make this wrapper a column with min-h-0 so its flex-1 child can scroll */}
         <div className="p-4 flex flex-col flex-1 mt-4 min-h-0">
           <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest px-2 mb-4">
             Intelligence Feed
           </div>
 
-          {/* Scrollable list container: flex-1 + overflow-y-auto */}
           <div className="flex-1 overflow-y-auto space-y-3 pr-2">
             {chats.length === 0 && (
-              <div className="text-sm text-muted-foreground px-2">No chats yet</div>
+              <div className="text-sm text-muted-foreground px-2">
+                No chats yet
+              </div>
             )}
 
             {[...chats].reverse().map((chat, index) => (
               <button
                 key={chat._id ?? index}
                 onClick={() => handleChangeOfChat(chat._id)}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl bg-secondary text-secondary-foreground text-sm border border-border hover:border-primary/50 transition-colors"
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-xl
+                           bg-secondary text-secondary-foreground text-sm
+                           border border-border hover:border-primary/50 transition-colors"
               >
-                <FileText size={16} className="text-primary" /> {chat.title}
+                <FileText size={16} className="text-primary" />
+                {chat.title}
               </button>
             ))}
-
           </div>
-            <button
-              onClick={() => { setCurrentChat(null); setMessages([]); }}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-xl bg-secondary text-secondary-foreground text-sm border border-border hover:border-primary/50 transition-colors"
-            >
-              <FileText size={16} className="text-primary" /> New Chat
-            </button>
 
-          {/* Upload button stays below the scrollable list */}
+          <button
+            onClick={() => {
+              setCurrentChat(null);
+              setMessages([]);
+            }}
+            className="w-full mt-3 flex items-center gap-3 px-3 py-2 rounded-xl
+                       bg-secondary text-secondary-foreground text-sm
+                       border border-border hover:border-primary/50 transition-colors"
+          >
+            <FileText size={16} className="text-primary" />
+            New Chat
+          </button>
+
           <div className="mt-3">
-            <Link to="/upload" className="block">
+            <Link to="/upload">
               <Button variant="outline" className="w-full justify-start gap-2">
-                <Upload size={16} /> Upload Documents
+                <Upload size={16} />
+                Upload Documents
               </Button>
             </Link>
           </div>
@@ -113,102 +137,195 @@ export default function Dashboard() {
             <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
               <User size={20} className="text-primary" />
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-sidebar-foreground truncate">
-                {user?.email}
-              </p>
-            </div>
+            <p className="text-sm font-medium truncate">
+              {user?.email}
+            </p>
           </div>
-          <Button 
-            variant="ghost" 
+
+          <Button
+            variant="ghost"
             className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
             onClick={handleSignOut}
           >
-            <LogOut size={16} /> Sign Out
+            <LogOut size={16} />
+            Sign Out
           </Button>
         </div>
       </aside>
-  
+
       {/* Main Container */}
-      <main className="flex-1 flex flex-col m-2 ml-0 rounded-3xl bg-card/50 border border-border overflow-hidden shadow-2xl">
-        
+      <main className="flex-1 flex flex-col m-2 ml-0 rounded-3xl
+                       bg-card/50 border border-border overflow-hidden shadow-2xl">
+
         {/* Header */}
-        <header className="h-20 border-b border-border flex items-center px-8 justify-between bg-card/80 backdrop-blur-xl">
-          <div>
-            <h2 className="text-[10px] font-bold text-primary uppercase tracking-[0.2em]">Live Analysis</h2>
-            <p className="text-xl font-display font-bold text-foreground">Risk Intelligence Terminal</p>
-          </div>
-          <div className={`transition-all duration-500 ${isProcessing ? 'opacity-100' : 'opacity-0'}`}>
-            <StatusStepper currentStep={currentStep} />
-          </div>
-        </header>
-  
+        <header
+  className="relative h-20 border-b border-border flex items-center
+             px-8 bg-card/80 backdrop-blur-xl"
+>
+  {/* LEFT — flexible, can shrink */}
+  <div className="flex items-center gap-3 min-w-0 flex-1">
+    <p className="text-xl font-display font-bold whitespace-nowrap">
+      Risk Intelligence Terminal
+    </p>
+
+    {currentDocument && (
+  <div
+    className="flex items-center gap-2 px-3 py-1 rounded-xl
+               bg-secondary border border-border text-sm
+               text-foreground
+               max-w-[280px] min-w-[120px]"
+  >
+    <FileText size={14} className="text-primary flex-shrink-0" />
+
+    <span
+      className="truncate max-w-[220px]"
+      title={currentDocument.filename}
+    >
+      {currentDocument.filename}
+    </span>
+  </div>
+)}
+
+  </div>
+
+  {/* RIGHT — fixed, never pushed */}
+  <div className="flex items-center gap-4 flex-shrink-0">
+    <div
+      className={`transition-all duration-500 ${
+        isProcessing ? 'opacity-100' : 'opacity-0'
+      }`}
+    >
+      <StatusStepper currentStep={currentStep} />
+    </div>
+
+    {/* Button */}
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        setShowDropdown((prev) => !prev);
+      }}
+      className="px-4 py-2 rounded-xl bg-secondary border border-border
+                 text-sm font-medium hover:border-primary/50 transition-all"
+    >
+      Intelligence ▾
+    </button>
+
+    {/* DROPDOWN — FIXED POSITION (not clipped) */}
+    {showDropdown && (
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="fixed right-8 top-24 w-72 rounded-2xl
+                   bg-card/95 backdrop-blur-xl border border-border
+                   shadow-2xl z-50
+                   animate-in fade-in slide-in-from-top-2"
+      >
+        <div className="px-4 py-3 border-b border-border">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+            Signals
+          </p>
+        </div>
+
+        <div className="max-h-64 overflow-y-auto p-2 space-y-1">
+          {documents.map((item, idx) => {
+            const isComplete = item.percent_complete === 100;
+
+            return (
+              <button
+                key={idx}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDropdown(false);
+                  if (isComplete) setCurrentDocument(item);
+                }}
+                className={`w-full text-left px-3 py-2 rounded-xl text-sm
+                            border border-border transition-colors
+                            ${
+                              isComplete
+                                ? 'bg-green-500/15 text-green-600 hover:bg-green-500/25'
+                                : 'bg-yellow-500/15 text-yellow-600 hover:bg-yellow-500/25'
+                            }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate font-medium">
+                    {item.filename}
+                  </span>
+
+                  <span
+                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full
+                                ${
+                                  isComplete
+                                    ? 'bg-green-500/20 text-green-700'
+                                    : 'bg-yellow-500/20 text-yellow-700'
+                                }`}
+                  >
+                    {item.percent_complete}%
+                  </span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    )}
+  </div>
+</header>
+
+
         {/* Chat Thread */}
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-12 space-y-12 bg-background">
+        <div
+          ref={scrollRef}
+          className="flex-1 overflow-y-auto p-4 md:p-12 space-y-12 bg-background"
+        >
           {messages.length === 0 && (
             <div className="flex items-center justify-center h-full">
               <div className="text-center max-w-md">
                 <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-primary/10 flex items-center justify-center">
                   <ShieldAlert className="text-primary" size={32} />
                 </div>
-                <h3 className="font-display text-2xl font-bold text-foreground mb-2">
+                <h3 className="font-display text-2xl font-bold mb-2">
                   Welcome to RiskSense Pro
                 </h3>
                 <p className="text-muted-foreground">
-                  Ask me anything about financial risks, regulatory compliance, or upload documents for analysis.
+                  Ask about financial risks or upload documents for analysis.
                 </p>
               </div>
             </div>
           )}
-          
+
           {messages.map((msg, idx) => (
-            <div key={idx} className="flex gap-6 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
-              
+            <div
+              key={idx}
+              className="flex gap-6 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700"
+            >
               <div className="flex-shrink-0 mt-1">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                  msg.role === 'user' 
-                    ? 'bg-secondary text-secondary-foreground' 
-                    : 'bg-transparent text-primary border border-primary/30'
+                  msg.role === 'user'
+                    ? 'bg-secondary'
+                    : 'border border-primary/30 text-primary'
                 }`}>
                   {msg.role === 'user' ? <User size={16} /> : <Bot size={18} />}
                 </div>
               </div>
 
               <div className="flex-1 space-y-2">
-                <div className={`text-[10px] font-bold uppercase tracking-[0.2em] opacity-40 mb-2 ${
-                  msg.role === 'user' ? 'text-muted-foreground' : 'text-primary'
-                }`}>
+                <div className="text-[10px] font-bold uppercase tracking-[0.2em] opacity-40">
                   {msg.role === 'user' ? 'User' : 'RiskSense Intelligence'}
                 </div>
 
-                <div className={`leading-relaxed text-[16px] text-foreground font-light ${
-                  isProcessing && idx === messages.length - 1 
-                    ? 'after:content-["▋"] after:ml-1 after:animate-pulse after:text-primary' 
-                    : ''
-                }`}>
+                <div className="leading-relaxed text-[16px] font-light">
                   {formatGeminiText(msg.content)}
                 </div>
-
-                {msg.role !== 'user' && (
-                  <div className="flex items-center gap-4 pt-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button className="text-muted-foreground hover:text-primary transition-colors">
-                      <Copy size={14} />
-                    </button>
-                    <button className="text-muted-foreground hover:text-primary transition-colors">
-                      <ThumbsUp size={14} />
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
           ))}
         </div>
-  
-        {/* Input Section */}
-        <footer className="relative p-6 bg-gradient-to-t from-card via-card to-transparent">
+
+        {/* Input */}
+        <footer className="p-6 bg-gradient-to-t from-card via-card to-transparent">
           <div className="max-w-3xl mx-auto">
-            <div className="relative flex items-end bg-secondary border border-border rounded-2xl shadow-2xl focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all p-2">
-              <textarea 
+            <div className="flex items-end bg-secondary border border-border
+                            rounded-2xl shadow-2xl p-2">
+              <textarea
                 rows="1"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -219,19 +336,16 @@ export default function Dashboard() {
                   }
                 }}
                 placeholder="Ask about financial risks..."
-                className="w-full bg-transparent p-3 text-[15px] outline-none resize-none placeholder:text-muted-foreground min-h-[44px] max-h-48 text-foreground"
+                className="w-full bg-transparent p-3 resize-none outline-none"
               />
-              <button 
+              <button
                 onClick={handleSend}
                 disabled={!input.trim() || isProcessing}
-                className="mb-1 mr-1 p-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 active:scale-90 transition-all disabled:bg-muted disabled:text-muted-foreground"
+                className="p-2 bg-primary rounded-xl text-primary-foreground"
               >
                 <Send size={20} />
               </button>
             </div>
-            <p className="text-center text-[10px] text-muted-foreground mt-3 tracking-wide">
-              RiskSense AI can make mistakes. Check important financial info.
-            </p>
           </div>
         </footer>
       </main>

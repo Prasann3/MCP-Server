@@ -59,28 +59,56 @@ export default function Upload() {
 
   const handleUpload = async () => {
     if (files.length === 0) return;
-    
+  
     setUploading(true);
-    
-    // Simulate upload progress
+  
     for (const fileItem of files) {
-      setFiles(prev => prev.map(f => 
-        f.id === fileItem.id ? { ...f, status: 'uploading' } : f
-      ));
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setFiles(prev => prev.map(f => 
-        f.id === fileItem.id ? { ...f, status: 'complete' } : f
-      ));
+      try {
+        // mark uploading
+        setFiles(prev =>
+          prev.map(f =>
+            f.id === fileItem.id ? { ...f, status: 'uploading' } : f
+          )
+        );
+  
+        const formData = new FormData();
+        formData.append("file", fileItem.file); // 🔑 key = "file"
+  
+        const response = await fetch("http://127.0.0.1:8000/api/v1/uploads", {
+          method: "POST",
+          body: formData,
+          credentials : "include"
+        });
+  
+        if (!response.ok) {
+          throw new Error("Upload failed");
+        }
+  
+        // mark complete
+        setFiles(prev =>
+          prev.map(f =>
+            f.id === fileItem.id ? { ...f, status: 'complete' } : f
+          )
+        );
+      } catch (err) {
+        console.error(err);
+  
+        setFiles(prev =>
+          prev.map(f =>
+            f.id === fileItem.id ? { ...f, status: 'error' } : f
+          )
+        );
+      }
     }
-    
+  
     setUploading(false);
+  
     toast({
-      title: 'Upload complete',
-      description: `${files.length} document(s) uploaded successfully.`
+      title: "Upload complete",
+      description: `${files.length} document(s) uploaded successfully.`,
     });
   };
+  
 
   return (
     <div className="min-h-screen bg-background">

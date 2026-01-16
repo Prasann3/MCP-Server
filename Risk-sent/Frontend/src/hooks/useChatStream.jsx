@@ -6,7 +6,7 @@ export const useChatStream = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
 
-  const sendMessage = async (input , currentChatId , setChats , setCurrentChat) => {
+  const sendMessage = async (input , currentChatId , setChats , setCurrentChat , currentDocumentId) => {
     setIsProcessing(true);
     setCurrentStep(1);
     setError(null);
@@ -32,12 +32,15 @@ export const useChatStream = () => {
              currentChatId = data._id
              fetchChat = true;
       }
-
+      const body = {
+        role : "user" , content: input  
+      }
+      if(currentDocumentId)body.doc_id = currentDocumentId
       const response = await fetch(`http://127.0.0.1:8000/api/v1/chats/${currentChatId}/messages`, {
         method: 'POST',
         credentials : "include",
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role : "user" , content: input })
+        body: JSON.stringify(body)
       });
      
      

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status , Request
 from fastapi.responses import StreamingResponse
 from typing import List
 from app.schemas.chat_schema import ChatCreate, ChatOut, ChatUpdate, Message
@@ -59,7 +59,10 @@ async def remove_chat(chat_id: str, user_id: str = Depends(get_current_user)):
 
 
 @router.post("/{chat_id}/messages")
-async def post_message(chat_id: str, message: Message , user_id: str = Depends(get_current_user)):
+async def post_message(chat_id: str, request: Request, message: Message , user_id: str = Depends(get_current_user)):
+    body = await request.json()
+    doc_id = body.get("doc_id")
+    print("doc_id" , doc_id)
     chat = await get_chat_by_id(chat_id)
     if not chat:
       raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
@@ -74,7 +77,7 @@ async def post_message(chat_id: str, message: Message , user_id: str = Depends(g
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to add message")
     # Ask the LLM for the response
     return StreamingResponse(
-        agent_manager.run_query(message.content, chat),
+        agent_manager.run_query(message.content, chat, doc_id),
         media_type="application/json"
     )
     

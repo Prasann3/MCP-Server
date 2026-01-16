@@ -24,6 +24,8 @@ async def get_chat_by_id(chat_id: str) -> Optional[dict]:
     if not ObjectId.is_valid(chat_id):
         return None
     chat = await mongo_client.db.chats.find_one({"_id": ObjectId(chat_id)} , {"messages": {"$slice": -10}})
+    if not chat :
+        return None
     chat["_id"] = str(chat["_id"])
     return chat
 

@@ -6,7 +6,7 @@ from app.api.v1.router import api_router
 
 app = FastAPI(title="Risk-Sensing AI")
 app.add_event_handler("startup", mongo_client.connect)
-app.add_event_handler("startup", mongo_client.close)
+app.add_event_handler("shutdown", mongo_client.close)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[

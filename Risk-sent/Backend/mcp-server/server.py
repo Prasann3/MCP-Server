@@ -1,5 +1,5 @@
 from mcp.server.fastmcp import FastMCP
-from app.services.ai_service import ai_service  # Importing your RAG brain
+from app.services.ai_service import rag_service  # Importing your RAG brain
 import sys
 import logging
 import sys
@@ -13,7 +13,7 @@ mcp = FastMCP("RiskSensingSpecialist")
 
 # Defineing the Specialist Tool
 @mcp.tool()
-def search_10k_risks(query: str) -> str:
+async def search_10k_risks(query: str , doc_id : str) -> str:
     """
     Search through Microsoft 10-K filings to find specific risk factors.
     Use this for questions about financial, legal, or market risks.
@@ -21,7 +21,9 @@ def search_10k_risks(query: str) -> str:
     try:
         # Trigger the RAG Engine
         # Returns Parent paragraphs (rich context) for better AI reasoning
-        retrieved_docs = ai_service.search_risks(query)
+        if not doc_id :
+            return "**ERROR** : Cannot use this tool"
+        retrieved_docs = await rag_service.search_risks(query , doc_id)
         
         if not retrieved_docs:
             return "No specific risks found for this query in the documents."
@@ -29,8 +31,8 @@ def search_10k_risks(query: str) -> str:
         # Formatting the "Observation" for the LLM
         formatted_results = []
         for doc in retrieved_docs:
-            page_num = doc.metadata.get("page", "Unknown")
-            content = doc.page_content.strip()
+            page_num = doc.get("page", "Unknown")
+            content = doc.get("text", "Unknown").strip()
             formatted_results.append(f"--- [SOURCE: PAGE {page_num}] ---\n{content}")
 
         return "\n\n".join(formatted_results)
