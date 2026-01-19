@@ -3,10 +3,25 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.db.client import mongo_client
 from app.api.v1.router import api_router
+from agent_manager import agent_manager
+from contextlib import asynccontextmanager
 
-app = FastAPI(title="Risk-Sensing AI")
-app.add_event_handler("startup", mongo_client.connect)
-app.add_event_handler("shutdown", mongo_client.close)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # --- STARTUP LOGIC ---    
+    await agent_manager.initialize() 
+    await mongo_client.connect()
+    yield # The app stays here while running
+    
+    # --- SHUTDOWN LOGIC ---
+    # Close the MCP Child Process (Cleanup pipes)
+    await agent_manager.shutdown()
+    await mongo_client.close()
+    
+
+app = FastAPI(title="Risk-Sensing AI" , lifespan = lifespan)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[

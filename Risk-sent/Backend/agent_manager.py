@@ -1,22 +1,34 @@
 import logging
-from app.core.logging import logger
 from app.utils.uploads import wrap_tool_with_context
 from langchain_groq import ChatGroq
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langgraph.prebuilt import create_react_agent
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+from contextlib import AsyncExitStack
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from langchain_mcp_adapters.tools import load_mcp_tools
 from app.core.config import settings 
 from app.services.chat_services import update_chat , get_message_size
 import json
 import asyncio
 from app.schemas.chat_schema import Message , ChatUpdate
 from app.services.chat_services import add_message
+import sys
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stderr  
+)
+
+logger = logging.getLogger(__name__)
 
 class RiskAgentManager:
     def __init__(self):
         # 1. Initialize the Brain (Groq LLM)
         # We use a high-reasoning model (Llama 3 70B) to make good decisions
+        # No connection takes place here only the llm object is initialized
         self.llm = ChatGroq(
             model="llama-3.1-8b-instant", 
             groq_api_key=settings.GROK_API_KEY
@@ -27,41 +39,57 @@ class RiskAgentManager:
         self.mcp_client = MultiServerMCPClient({
             "risk_server": {
                 "command": "python",
-                "args": ["-m" , "mcp-server.server"], # Path to your specialist code
+                "args": ["-m" , "mcp-server.server"], 
                 "transport": "stdio",
             }
         })
         self.cached_tools = None
-        self.agent = None
+        self.stack = AsyncExitStack()
+        self.base_tools = None
+
+
+    async def initialize(self):
+            """Starts the MCP child process and keeps it alive."""
+            logger.info("Starting Persistent MCP Session...")
+            
+            # 1. Start the child process and enter the session
+            # This is where the 'python -m mcp-server.server' command runs!
+            self.session = await self.stack.enter_async_context(
+                self.mcp_client.session("risk_server")
+            )
+            
+            # 2. Pre-load tool definitions through the active pipe
+            self.base_tools = await load_mcp_tools(self.session)
+            logger.info("MCP Server is WARM and tools are cached.")
+
+    async def shutdown(self):
+            """Kills the child process. Call this when the app closes."""
+            await self.stack.aclose()
+            logger.info("MCP Child Process terminated.")
 
     async def get_agent(self , doc_id=None):
         # MCP tools
         logger.info("Collecting MCP Tools")
-        mcp_tools = None
-        if not self.cached_tools :
-         mcp_tools = await self.mcp_client.get_tools()
-         self.cached_tools = mcp_tools
-        else :
-            mcp_tools = self.cached_tools 
+        mcp_tools = self.base_tools
         
         if doc_id :
          contextual_tools = [
-         wrap_tool_with_context(t, doc_id) if t.name == "search_10k_risks" else t 
+         wrap_tool_with_context(t, doc_id) if t.name == "semantic_search" else t 
          for t in mcp_tools
          ] 
 
         else :
 
           contextual_tools = [
-            t for t in mcp_tools if t.name != "search_10k_risks"
+            t for t in mcp_tools if t.name != "semantic_search"
           ]  
 
     
-        self.agent = create_react_agent(
+        agent = create_react_agent(
             self.llm, 
             tools=contextual_tools
         )
-        return self.agent
+        return agent
 
 
     async def run_query(self, user_input: str, chat , doc_id = None):
@@ -104,11 +132,12 @@ class RiskAgentManager:
             - **Tone**: Do not leak internal details or mention that you were provided info by a tool. 
             -**Behaviour**: You must assisst the user in every way possible to get the best possible answer. Try to answer every question possible
             - **Scope**: Do not mention what internally you are doing to answer the query , just answer the query as best as you can."
+            - Important: Call only the tools provided to you , if you cant answer the query using the tools provided to you , then say that you cant answer the query.
 
             ### FORMATTING
             You must format your tool call EXACTLY like this: 
             <function=tool_name>{{"parameters": "parameters"}}</function>
-            **Important**: Call only the tools provided to you , if you cant answer the query using the tools provided to you , then say that you cant answer the query.
+
             """
 
             yield json.dumps({"status": "Searching 10-K", "step": 3}) + "\n"
@@ -169,7 +198,7 @@ class RiskAgentManager:
         except Exception as e:
             logging.error(f"Error occurred while processing the request: {str(e)}")
             yield json.dumps({"status": "Error", "step": 5, "error": str(e)}) + "\n"
-            raise e
+            
 
     async def summarize_messages(self , summary : str, messages : list[Message]) -> str : 
           

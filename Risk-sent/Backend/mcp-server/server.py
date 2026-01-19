@@ -7,20 +7,19 @@ logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 logger = logging.getLogger(__name__)
 
 
-
 # Initialize the Specialist Server
 mcp = FastMCP("RiskSensingSpecialist")
 
 # Defineing the Specialist Tool
 @mcp.tool()
-async def search_10k_risks(query: str , doc_id : str) -> str:
+async def semantic_search(query: str , doc_id : str) -> str:
     """
-    Search through Microsoft 10-K filings to find specific risk factors.
-    Use this for questions about financial, legal, or market risks.
+    Search for any specific context.
     """
     try:
         # Trigger the RAG Engine
         # Returns Parent paragraphs (rich context) for better AI reasoning
+        logger.info("The tool is called in the MCP server")
         if not doc_id :
             return "**ERROR** : Cannot use this tool"
         retrieved_docs = await rag_service.search_risks(query , doc_id)
