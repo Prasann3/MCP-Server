@@ -1,5 +1,5 @@
 from mcp.server.fastmcp import FastMCP
-from app.services.ai_service import rag_service  # Importing your RAG brain
+from app.services.ai_service import rag_service  
 import sys
 import logging
 import sys
@@ -17,8 +17,7 @@ async def semantic_search(query: str , doc_id : str) -> str:
     Search for any specific context.
     """
     try:
-        # Trigger the RAG Engine
-        # Returns Parent paragraphs (rich context) for better AI reasoning
+       
         logger.info("The tool is called in the MCP server")
         if not doc_id :
             return "**ERROR** : Cannot use this tool"

@@ -15,6 +15,7 @@ import asyncio
 from app.schemas.chat_schema import Message , ChatUpdate
 from app.services.chat_services import add_message
 import sys
+from langchain_groq import ChatGroq
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,16 +27,16 @@ logger = logging.getLogger(__name__)
 
 class RiskAgentManager:
     def __init__(self):
-        # 1. Initialize the Brain (Groq LLM)
-        # We use a high-reasoning model (Llama 3 70B) to make good decisions
+        # 1. Initialize the LLM
         # No connection takes place here only the llm object is initialized
-        self.llm = ChatGroq(
-            model="llama-3.1-8b-instant", 
-            groq_api_key=settings.GROK_API_KEY
-        )
+        self.llms = [
+           ChatGroq(
+             model="llama-3.1-8b-instant", 
+             groq_api_key = settings.GROK_API_KEY
+           )
+        ]
         
         # 2. Define the MCP Connection
-        # This tells the manager WHERE to find the "Specialist"
         self.mcp_client = MultiServerMCPClient({
             "risk_server": {
                 "command": "python",
@@ -43,6 +44,7 @@ class RiskAgentManager:
                 "transport": "stdio",
             }
         })
+        self.llm_selector = 0
         self.cached_tools = None
         self.stack = AsyncExitStack()
         self.base_tools = None
@@ -86,9 +88,10 @@ class RiskAgentManager:
 
     
         agent = create_react_agent(
-            self.llm, 
+            self.llms[self.llm_selector], 
             tools=contextual_tools
         )
+        self.llm_selector = (self.llm_selector + 1) % len(self.llms)
         return agent
 
 
@@ -243,7 +246,8 @@ class RiskAgentManager:
             content="Summarize the conversation so far."
              ))  
 
-          response = await self.llm.ainvoke(llm_messages) 
+          response = await self.llms[self.llm_selector].ainvoke(llm_messages)
+          self.llm_selector = (self.llm_selector + 1) % len(self.llms); 
           return response.content  
 
     async def get_title(self , user_input : str , llm_response : str) -> str :
@@ -289,7 +293,8 @@ class RiskAgentManager:
             content="Generate the title for the given inputs"
         ))
 
-        response = await self.llm.ainvoke(llm_messages)
+        response = await self.llms[self.llm_selector].ainvoke(llm_messages)
+        self.llm_selector = (self.llm_selector + 1) % len(self.llms)
         return response.content      
 
 

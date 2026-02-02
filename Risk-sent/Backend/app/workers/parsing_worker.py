@@ -1,7 +1,7 @@
 import asyncio
 import struct
 import json
-import signal
+import time
 from uuid import uuid4
 from app.services.redis import redis_client
 from app.core.logging import logging
@@ -108,7 +108,7 @@ class ParseWorker:
         loop = asyncio.get_running_loop()
         future = loop.create_future()
         self.futures[job_id] = future
-
+        start_time = time.perf_counter()
         # Send to C++ via stdin
         logger.info(f"Sending the job id={job_id} to child process for parsing")
         await self.send_job_to_cpp({ "job_id" : job_data['job_id'] , "file_path" : job_data['file_path']})
@@ -168,9 +168,10 @@ class ParseWorker:
 
             # Push to Redis queue "upload_queue"
             # Using rpush to add to the end of the list
+            duration = time.perf_counter() - start_time
             await self.redis.rpush("upload_queue", json.dumps(queue_job))
             
-            logger.info(f"Batched {len(batch_slice)} docs for doc_id {doc_id} to upload_queue")
+            logger.info(f"Batched {len(batch_slice)} docs for doc_id {doc_id} to upload_queue in Time: {duration:.2f}s")
                 
 
     def stop(self):

@@ -22,7 +22,6 @@ router = APIRouter()
 
 @router.post("/")
 async def upload_new_document(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     user_id: str = Depends(get_current_user),
 ):
@@ -42,7 +41,7 @@ async def upload_new_document(
         with pdfplumber.open(file.file) as pdf:
             total_pages = len(pdf.pages)
 
-        # reset cursor again (VERY IMPORTANT)
+        # 4. reset cursor again (VERY IMPORTANT)
         file.file.seek(0)
         logger.info(f"Got ingestion request of file of size ${file_size_mb} and ${total_pages} pages")
         # 5. Build DB document (matches schema exactly)
@@ -78,12 +77,7 @@ async def upload_new_document(
             "user_id" : user_id
         }
         await redis_client.lpush("parse_queue" , json.dumps(job_payload))
-        # background_tasks.add_task(
-        # rag_service.ingest_pdf ,
-        # str(file_path),
-        # user_id,
-        # document["_id"] 
-        # )
+
         return {
             "status": "success",
             "document_id": document["_id"],

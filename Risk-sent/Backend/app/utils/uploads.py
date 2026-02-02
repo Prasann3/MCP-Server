@@ -3,6 +3,7 @@ import pdfplumber
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
+## Currently not being used , instead cpp subprocess is being used for better performance
 def extract_text_from_pdf(file_path: str) -> str:
     text = []
 
@@ -29,5 +30,5 @@ def wrap_tool_with_context(tool, doc_id: str):
         coroutine=wrapped_func,
         name=tool.name,
         description=tool.description,
-        args_schema=SearchSchema # Keeps the original schema (minus doc_id if you prefer)
+        args_schema=SearchSchema 
     )

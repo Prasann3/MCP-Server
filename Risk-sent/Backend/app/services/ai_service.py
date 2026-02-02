@@ -13,6 +13,8 @@ from fastapi import UploadFile
 ## Setting up logger
 logger = logging.getLogger(__name__)
 
+## The ingestion service is not used in the new architecture , instead redis is begin used for better scalability
+## Only the query service is being used
 class RiskSentAIService:
     def __init__(self):
         # 1. Initialize Embeddings (384 dimensions for all-MiniLM-L6-v2)
@@ -79,7 +81,7 @@ class RiskSentAIService:
             child_docs = self.child_splitter.split_text(p_doc.page_content)
 
             if child_docs:
-                # 🔥 MOVE EMBEDDINGS OFF event loop too
+               
                 embeddings = await loop.run_in_executor(
                     None,
                     self.embeddings.embed_documents,
