@@ -86,12 +86,12 @@ This allows analysts to conduct extended investigative sessions without context 
 
 | Layer           | Technology                    |
 | --------------- | ----------------------------- |
-| Backend API     | FastAPI, Python 3.12          |
-| Native Engine   | C++17                         |
+| Backend API     | FastAPI, Python               |
+| Native Engine   | C++                           |
 | Vector Database | MongoDB Atlas (Vector Search) |
 | Queue System    | Redis                         |
 | AI Framework    | LangChain, MCP                |
-| LLM Providers   | OpenAI / Anthropic            |
+| LLM Providers   | GROQ                          |
 | Frontend        | React + Vite                  |
 | Deployment      | Docker                        |
 
@@ -102,16 +102,38 @@ This allows analysts to conduct extended investigative sessions without context 
 ```
 .
 ├── app/
-│   ├── api/v1/routes/      # Chats, uploads, and user management
-│   ├── services/           # AI services, agent manager, Redis logic
-│   ├── workers/            # Multi-process task workers
-│   │   ├── worker.cpp      # High-efficiency C++ parser
-│   │   ├── parsing_worker  # Parsing orchestration
-│   │   └── upload_worker   # Bulk database ingestion
-│   └── main.py             # FastAPI entry point
-├── mcp-server/             # MCP tools and logic
-├── Dockerfile              # Multi-process container setup
-└── requirements.txt        # Python dependencies
+│   ├── api/                    # API Versioning and Routing
+│   │   └── v1/
+│   │       ├── routes/         # Endpoint definitions (chats, uploads, users)
+│   │       └── router.py       # Main V1 Router aggregator
+│   ├── core/                   # Application-wide singletons and logic
+│   │   ├── agent_manager.py    # Orchestration of MCP + LLM
+│   │   ├── auth.py             # JWT/Security logic
+│   │   ├── config.py           # Pydantic Settings / ENV loading
+│   │   └── logging.py          # Unified logging configuration
+│   ├── db/                     # Data persistence layer
+│   │   └── client.py           # MongoDB / Vector Search clients
+│   ├── models/                 
+│   ├── schemas/                # Pydantic request/response models
+│   ├── services/               # Pure business logic
+│   │   ├── ai_service.py       # RAG Service
+│   │   ├── chat_services.py    # Chat-specific operations
+│   │   ├── redis.py            # Redis Queue management
+│   │   └── user_service.py     # User management logic
+│   ├── utils/                  # Reusable helper functions
+│   └── workers/                # High-performance Task Processing
+│       ├── worker.cpp          # Native C++ Parser source
+│       ├── parsing_worker.py   # Python bridge for C++ subprocess
+│       └── upload_worker.py    # Async background DB ingestion
+│   └── main.py                 # FastAPI Application entry point
+├── mcp-server/                 # Model Context Protocol Implementation
+│   ├── tools/                  # LLM-accessible tool definitions
+│   └── server.py               # MCP Server entry point
+├── data/                       # Sample data & uploaded PDFs
+├── tests/                      # Integration and Load testing
+│   └── load_test.py
+├── Dockerfile                  # Multi-process build configuration
+└── requirements.txt            # Python dependencies
 ```
 
 ---
@@ -132,7 +154,7 @@ Create a `.env` file:
 
 ```env
 MONGO_URI=your_mongodb_uri
-OPENAI_API_KEY=your_api_key
+GROQ_API_KEY=your_api_key
 ```
 
 ### 3️⃣ Run the System
@@ -149,9 +171,9 @@ docker run -d \
 
 ## 📡 Accessing the API
 
-Once running, access the interactive Swagger documentation:
+Once running, access the backend:
 
-👉 [http://localhost:8000/docs](http://localhost:8000/docs)
+👉 [http://localhost:8000](http://localhost:8000)
 
 ---
 
