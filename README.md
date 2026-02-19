@@ -6,13 +6,27 @@
 ![Docker](https://img.shields.io/badge/Docker-Enabled-blue)
 ![Redis](https://img.shields.io/badge/Redis-Task--Queue-red)
 
-**Risk-Sent** is an advanced AI-powered intelligence platform designed for financial analysts to automate the extraction, analysis, and querying of complex financial filings (like 10-Ks). By bridging high-performance native C++ parsing with modern RAG architectures, it solves the bottlenecks of traditional document processing.
+**Risk-Sent** is a high-performance AI-powered financial document intelligence platform designed to automate the extraction, analysis, and querying of complex regulatory filings (e.g., 10-K, 10-Q, annual reports). By combining native C++ performance with modern Retrieval-Augmented Generation (RAG) architectures, Risk-Sent eliminates the traditional bottlenecks of large-scale document processing.
+
+---
+
+## 🚀 Overview
+
+Financial analysts spend countless hours navigating massive filings to locate risk signals, disclosures, and narrative insights. Risk-Sent transforms this workflow by:
+
+* ⚡ Parsing documents using a multi-threaded C++ engine
+* 🧠 Structuring knowledge through Parent–Child RAG
+* 🔎 Enabling semantic search over financial narratives
+* 🤖 Providing agentic querying via MCP tools
+* 📈 Maintaining long-running contextual conversations
+
+The system is designed for **throughput, scalability, and low-latency querying** under heavy workloads.
 
 ---
 
 ## 🏗️ System Architecture
 
-Risk-Sent utilizes a distributed, multi-process architecture to ensure that CPU-intensive parsing never blocks the API event loop.
+Risk-Sent uses a distributed, multi-process architecture where CPU-intensive workloads are isolated from the API layer to maintain responsiveness.
 
 ```mermaid
 graph TD
@@ -26,85 +40,130 @@ graph TD
     B -->|Query| I[Agent Manager]
     I <--> J[MCP Server Tools]
     J -->|Semantic Search| H
+```
 
-    ⚡ The High-Performance C++ Bridge
-To bypass the Python GIL and maximize throughput, Risk-Sent offloads PDF parsing to a multi-threaded C++ binary.
+### ⚡ High-Performance C++ Bridge
 
-Stream Protocol: Python and C++ communicate via streams using a custom protocol where the first 4 bytes indicate the payload size. This ensures zero-loss, high-speed data transfer.
+To bypass Python's GIL and maximize throughput, Risk-Sent offloads PDF parsing to a multi-threaded C++ binary.
 
-Efficiency: This allows the system to utilize 100% of available CPU cores for parsing while keeping the FastAPI event loop responsive.
+* **Stream Protocol:** Python and C++ communicate using a custom 4-byte header protocol that encodes payload size, ensuring reliable high-speed streaming.
+* **Efficiency:** Full CPU utilization during parsing while the FastAPI event loop remains non-blocking.
 
+---
 
-✨ Core Features
-1. Advanced Parent-Child RAG
-Unlike basic RAG, Risk-Sent uses a Parent-Child text pattern:
+## ✨ Core Features
 
-Child Chunks: Small snippets optimized for high-precision vector embedding and retrieval.
+### 1️⃣ Advanced Parent–Child RAG
 
-Parent Chunks: The larger surrounding context retrieved once a match is found, ensuring the LLM understands the full financial narrative.
+Unlike traditional RAG pipelines:
 
-2. MCP (Model Context Protocol) Server
-The system invokes an MCP server as a child process. This allows the LLM to dynamically call tools—such as semantic_search—to query the MongoDB vector database in real-time, functioning as a truly agentic system.
+* **Child Chunks:** Small semantic units optimized for embedding accuracy.
+* **Parent Chunks:** Larger contextual segments retrieved after a match to preserve narrative coherence.
 
-3. Intelligent Conversation Memory
-A custom memory manager provides the LLM with both short-term and long-term conversation history. This ensures the agent maintains full context over long research sessions.
+This architecture improves reasoning over long financial disclosures.
 
-4. Scalable Redis Workers
-Parsing Worker: Pulls from parse_queue, manages the C++ lifecycle, and generates chunks.
+### 2️⃣ MCP (Model Context Protocol) Server
 
-Upload Worker: Pulls from upload_queue and performs bulk writes to MongoDB to minimize database round-trips.
+Risk-Sent invokes an MCP server as a child process, allowing the LLM to dynamically call tools such as `semantic_search` against MongoDB Atlas Vector Search. This enables true agentic behavior.
 
+### 3️⃣ Intelligent Conversation Memory
 
-🛠️ Tech Stack
-Server: FastAPI, Python 3.12
+A custom memory manager maintains:
 
-Language Bridge: C++ (Native Binary)
+* **Short-term memory:** Recent conversation context
+* **Long-term memory:** Persistent research history
 
-Database: MongoDB (NoSQL + Vector Store)
+This allows analysts to conduct extended investigative sessions without context loss.
 
-Orchestration: Redis (Job Queues), Docker
+### 4️⃣ Scalable Redis Workers
 
-AI: LangChain, MCP, OpenAI/Anthropic LLMs
+* **Parsing Worker:** Consumes from `parse_queue`, manages C++ lifecycle, and generates document chunks.
+* **Upload Worker:** Consumes from `upload_queue` and performs bulk MongoDB writes to minimize round trips.
 
-Frontend: React + Vite
+---
 
+## 🛠️ Tech Stack
 
+| Layer           | Technology                    |
+| --------------- | ----------------------------- |
+| Backend API     | FastAPI, Python 3.12          |
+| Native Engine   | C++17                         |
+| Vector Database | MongoDB Atlas (Vector Search) |
+| Queue System    | Redis                         |
+| AI Framework    | LangChain, MCP                |
+| LLM Providers   | OpenAI / Anthropic            |
+| Frontend        | React + Vite                  |
+| Deployment      | Docker                        |
 
-📁 Project Structure
+---
 
+## 📁 Project Structure
+
+```
 .
 ├── app/
-│   ├── api/v1/routes/      # Chats, Uploads, and User management
-│   ├── services/           # AI Service, Agent Manager, Redis logic
-│   ├── workers/            # Multi-process Task Workers
-│   │   ├── worker.cpp      # Source for high-efficiency C++ parser
-│   │   ├── parsing_worker  # Orchestrates C++ child process
-│   │   └── upload_worker   # Handles bulk database ingestion
-│   └── main.py             # Entry point for FastAPI
-├── mcp-server/             # Model Context Protocol tools & logic
-├── Dockerfile              # Multi-process container configuration
+│   ├── api/v1/routes/      # Chats, uploads, and user management
+│   ├── services/           # AI services, agent manager, Redis logic
+│   ├── workers/            # Multi-process task workers
+│   │   ├── worker.cpp      # High-efficiency C++ parser
+│   │   ├── parsing_worker  # Parsing orchestration
+│   │   └── upload_worker   # Bulk database ingestion
+│   └── main.py             # FastAPI entry point
+├── mcp-server/             # MCP tools and logic
+├── Dockerfile              # Multi-process container setup
 └── requirements.txt        # Python dependencies
+```
 
+---
 
-⚙️ Setup & Deployment
-Build the Image
-The Dockerfile is configured to compile the C++ source and set up the Python 3.12 environment automatically.
+## ⚙️ Setup & Deployment
 
-# docker build -t risk-sent-app .
+### 1️⃣ Build the Image
 
-Run the System
-Ensure you have a .env file with your MONGO_URI and OPENAI_API_KEY
+The Dockerfile compiles the C++ parser and prepares the Python 3.12 runtime automatically.
 
+```bash
+docker build -t risk-sent-app .
+```
+
+### 2️⃣ Configure Environment
+
+Create a `.env` file:
+
+```env
+MONGO_URI=your_mongodb_uri
+OPENAI_API_KEY=your_api_key
+```
+
+### 3️⃣ Run the System
+
+```bash
 docker run -d \
   -p 8000:8000 \
   --name risk-sent-container \
   --restart unless-stopped \
   risk-sent-app
+```
+
+---
+
+## 📡 Accessing the API
+
+Once running, access the interactive Swagger documentation:
+
+👉 [http://localhost:8000/docs](http://localhost:8000/docs)
+
+---
+
+## 🎯 Target Audience
+
+Risk-Sent is built for:
+
+* Financial Analysts
+* Risk Managers
+* Research Analysts
+* Compliance Teams
+
+who need to extract actionable insights from thousands of pages of financial disclosures with minimal manual effort.
 
 
-  Accessing the API
-Once running, you can interact with the API via the Swagger UI at http://localhost:8000/docs.
-
-
-👨‍💻 Target Audience
-Risk-Sent is purpose-built for Financial Analysts and Risk Managers who need to extract insights from thousands of pages of text without the manual overhead of traditional document review.
