@@ -1,206 +1,191 @@
 import asyncio
-import struct
 import json
 import time
 from app.services.redis import redis_client
 from app.core.logging import logging
 from app.db.client import mongo_client
-from langchain_core.documents import Document
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from bson import ObjectId
 from pymongo import InsertOne, UpdateOne
 
-
-
-
+## Setting up logger
 logger = logging.getLogger(__name__)
 
 class UploadWorker:
-    def __init__(self , queue_name):
+    def __init__(self, queue_name):
         self.queue_name = queue_name
         self.running = True
         self.db = None
         self.MAX_JOB = 8
 
     async def start(self):
-        # 1. Connect to Redis
-        try :
+        # 1. Connect to Redis and DB
+        try:
             self.redis = redis_client
-            # 2. Connect to Database
             await mongo_client.connect()
             self.db = mongo_client.db
 
-            self.embeddings = HuggingFaceEmbeddings(
-                model_name="sentence-transformers/all-MiniLM-L6-v2",
-                model_kwargs={'device': 'cpu'}
+            # 2. Initialize FastEmbed (ONNX) - Matches your RAG Service
+            self.embedding_model = FastEmbedEmbeddings(
+                model_name="BAAI/bge-small-en-v1.5",
+                threads=4
             )
             
-            self.child_splitter = RecursiveCharacterTextSplitter(chunk_size=400, chunk_overlap=40)
+            self.child_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=400, 
+                chunk_overlap=40
+            )
 
             await self._redis_worker_loop()
-        except Exception as e : 
-            logger.error("Error occured during starting the worker... " , str(e))    
-
+        except Exception as e: 
+            logger.error(f"Error occurred during starting the worker: {str(e)}")    
 
     async def _redis_worker_loop(self):
-        """Pulls jobs from Redis and hands them to C++."""
-    
+        """Pulls jobs from Redis and handles them concurrently."""
         logger.info(f"Worker started. Listening to {self.queue_name}")
         try:
             while self.running:
-                # Long-poll Redis
-                while(self.MAX_JOB == 0) :
+                while self.MAX_JOB <= 0:
                     await asyncio.sleep(2)
+                
+                # Long-poll Redis
                 result = await self.redis.brpop(self.queue_name, timeout=2)
                 if result:
                     _, message = result
                     job_data = json.loads(message)
 
-                    # Create a task so we can handle multiple jobs concurrently
+                    # Manage concurrency
                     self.MAX_JOB -= 1
                     asyncio.create_task(self._process_job(job_data))
-
                     
         except Exception as e:
             logger.error(f"Redis Loop Error: {e}")
 
-
     async def _process_job(self, payload):
-        """Orchestrates a single job."""
-       
-
+        """Orchestrates a single job batch."""
         job_id = payload['job_id']
         data = payload['data']
         doc_id = data['doc_id']
         user_id = data['user_id']
         parent_docs_batch = data['parent_docs']
+        
         start_time = time.perf_counter()
         logger.info(f"Processing batch for Job={job_id}, Doc={doc_id}")
 
         parent_operations = []
         child_operations = []
         document_operations = []
-        for p_data in parent_docs_batch :
-            parent_id = ObjectId()
 
-            parent_record = {
-                "_id" :  parent_id,
-                "doc_id": doc_id,
-                "owner_id": user_id,
-                "text": p_data['text'],
-                "metadata": p_data['metadata']               
-            }
-            parent_operations.append(InsertOne(parent_record))
-            
-            child_texts = self.child_splitter.split_text(p_data['text'])
-            
-            if child_texts:
-                # 3. Generate Embeddings (this is usually the bottleneck)
-                # Ensure this is thread-safe if using local models
-                embeddings = self.embeddings.embed_documents(child_texts)
+        try:
+            for p_data in parent_docs_batch:
+                parent_id = ObjectId()
 
-                # 4. Bulk Insert Children
-                child_records = [
-                    {
-                        "parent_id": parent_id,
-                        "doc_id": doc_id,
-                        "owner_id": user_id,
-                        "embedding": vector,
-                        "text_snippet": text
-                    }
-                    for text, vector in zip(child_texts, embeddings)
-                ]
+                parent_record = {
+                    "_id": parent_id,
+                    "doc_id": doc_id,
+                    "owner_id": user_id,
+                    "text": p_data['text'],
+                    "metadata": p_data['metadata']               
+                }
+                parent_operations.append(InsertOne(parent_record))
+                
+                child_texts = self.child_splitter.split_text(p_data['text'])
+                
+                if child_texts:
+                    # 3. Generate Embeddings using FastEmbed
+                    # Returns a list of vectors
+                    embeddings = self.embedding_model.embed_documents(child_texts)
 
-                for child_record in child_records :
-                  child_operations.append(InsertOne(child_record))
+                    # 4. Create Child Records
+                    for text, vector in zip(child_texts, embeddings):
+                        child_operations.append(InsertOne({
+                            "parent_id": parent_id,
+                            "doc_id": doc_id,
+                            "owner_id": user_id,
+                            "embedding": list(vector), # Convert numpy array to list for BSON
+                            "text_snippet": text
+                        }))
 
-                document_operations.append(UpdateOne(
-                    {"_id": ObjectId(doc_id)},
-                    [
-                        {
-                            "$set": {
-                                "number_of_chunk_processed": {
-                                    "$add": ["$number_of_chunk_processed", 1]
+                    # 5. Track progress in the main document
+                    document_operations.append(UpdateOne(
+                        {"_id": ObjectId(doc_id)},
+                        [
+                            {
+                                "$set": {
+                                    "number_of_chunk_processed": {
+                                        "$add": ["$number_of_chunk_processed", 1]
+                                    }
                                 }
-                            }
-                        },
-                        {
-                            "$set": {
-                                "percent_complete": {
-                                    "$toInt": {
-                                        "$multiply": [
-                                            {
-                                                "$divide": [
-                                                    "$number_of_chunk_processed",
-                                                    "$number_of_parent_chunks"
-                                                ]
-                                            },
-                                            100
-                                        ]
+                            },
+                            {
+                                "$set": {
+                                    "percent_complete": {
+                                        "$toInt": {
+                                            "$multiply": [
+                                                {
+                                                    "$divide": [
+                                                        "$number_of_chunk_processed",
+                                                        "$number_of_parent_chunks"
+                                                    ]
+                                                },
+                                                100
+                                            ]
+                                        }
                                     }
                                 }
                             }
-                        }
-                    ]                    
-                ))
+                        ]                    
+                    ))
 
-        
-        await self.db.children.bulk_write(child_operations)
-        await self.db.parents.bulk_write(parent_operations)
+            # Bulk Write Operations
+            if child_operations:
+                await self.db.children.bulk_write(child_operations)
+            if parent_operations:
+                await self.db.parents.bulk_write(parent_operations)
 
-        document_operations.append(UpdateOne(
-            {"_id": ObjectId(doc_id)},
-            [
-                {
-                    "$set": {
-                        "status": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$number_of_chunk_processed",
-                                        "$number_of_parent_chunks"
-                                    ]
-                                },
-                                "processed",
-                                "$status"
-                            ]
-                        },
-                        "percent_complete": {
-                            "$cond": [
-                                {
-                                    "$eq": [
-                                        "$number_of_chunk_processed",
-                                        "$number_of_parent_chunks"
-                                    ]
-                                },
-                                100,
-                                "$percent_complete"
-                            ]
+            # Check if document is fully processed
+            document_operations.append(UpdateOne(
+                {"_id": ObjectId(doc_id)},
+                [
+                    {
+                        "$set": {
+                            "status": {
+                                "$cond": [
+                                    {"$gte": ["$number_of_chunk_processed", "$number_of_parent_chunks"]},
+                                    "processed",
+                                    "$status"
+                                ]
+                            },
+                            "percent_complete": {
+                                "$cond": [
+                                    {"$gte": ["$number_of_chunk_processed", "$number_of_parent_chunks"]},
+                                    100,
+                                    "$percent_complete"
+                                ]
+                            }
                         }
                     }
-                }
-            ]            
-        ))
+                ]            
+            ))
 
-        await self.db.document.bulk_write(document_operations)
-        duration = time.perf_counter() - start_time
-        logger.info(f"Processed batch for Job={job_id} in Time: {duration:.2f}s")
-        self.MAX_JOB += 1
+            if document_operations:
+                await self.db.document.bulk_write(document_operations)
+                
+            duration = time.perf_counter() - start_time
+            logger.info(f"Finished batch for Job={job_id} in {duration:.2f}s")
 
-        
+        except Exception as e:
+            logger.error(f"Error processing job {job_id}: {str(e)}")
+        finally:
+            self.MAX_JOB += 1
 
     def stop(self):
-        """Cleanup logic."""
         self.running = False
-        logger.info("Closing Event loop...")
-
-
-
+        logger.info("Stopping Worker...")
 
 async def main():
     worker = UploadWorker("upload_queue")
-
     try:
         await worker.start()
     except asyncio.CancelledError:
@@ -208,6 +193,5 @@ async def main():
     finally:
         worker.stop()
 
-# --- Main Entry Point ---
 if __name__ == "__main__":
     asyncio.run(main())

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 
-
+const API_URL = import.meta.env.VITE_BACKEND_URL;
 export const useUploadedDocuments = () => {
     
     let [documents , setDocuments] = useState([]);
@@ -9,7 +9,7 @@ export const useUploadedDocuments = () => {
 
     async function fetchDocuments() {
  
-        const response = await fetch("http://127.0.0.1:8000/api/v1/uploads/me", {
+        const response = await fetch(`${API_URL}/api/v1/uploads/me`, {
             method: "GET",
             credentials : "include"
           });
@@ -36,7 +36,7 @@ export const useUploadedDocuments = () => {
            
            for(let i = 0 ; i < unprocessedDocuments.length ; i++) { 
             const {doc , index} = unprocessedDocuments[i];
-            let res = await fetch(`http://127.0.0.1:8000/api/v1/uploads/is-processed/${doc.id}`);
+            let res = await fetch(`${API_URL}/api/v1/uploads/is-processed/${doc.id}`);
             let newDoc = await res.json()
             setDocuments( prev => prev.map( (item , j) => 
                                     j == index ? newDoc : item ) )

@@ -31,7 +31,6 @@ class ParseWorker:
             self.db = mongo_client.db
             # 3. Launch C++ Child Process
             self.process = await asyncio.create_subprocess_exec(
-                'wsl' ,
                 self.cpp_executable,
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
@@ -183,7 +182,7 @@ class ParseWorker:
             self.process.terminate()
 
 async def main():
-    worker = ParseWorker("/mnt/c/Users/Lenovo/OneDrive/Desktop/DE Shaw/Risk-sent/Backend/app/workers/worker", "parse_queue")
+    worker = ParseWorker("/app/worker", "parse_queue")
 
     try:
         await worker.start()

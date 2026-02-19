@@ -18,6 +18,7 @@ export default function Dashboard() {
   const scrollRef = useRef(null);
   let {documents , setDocuments , currentDocument , setCurrentDocument , fetchDocuments , pollerRef} = useUploadedDocuments()
   console.log(documents);
+  const API_URL = import.meta.env.VITE_BACKEND_URL;
   
   useEffect(() => {
     if (scrollRef.current) {
@@ -27,7 +28,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function getMyChats() {
-      const res = await fetch("http://127.0.0.1:8000/api/v1/users/mychat" , {
+      const res = await fetch(`${API_URL}/api/v1/users/mychat` , {
             credentials : "include"
       })
       const data = await res.json()
@@ -59,7 +60,7 @@ export default function Dashboard() {
 
   const handleChangeOfChat = (chatId) => {
     async function callBackend() {
-       const res = await fetch(`http://127.0.0.1:8000/api/v1/chats/${chatId}` , {
+       const res = await fetch(`${API_URL}/api/v1/chats/${chatId}` , {
            credentials: "include"
        })
        const chatObject = await res.json();

@@ -2,6 +2,7 @@ import { dataTagErrorSymbol } from '@tanstack/react-query';
 import { useState, useEffect, createContext, useContext } from 'react';
 
 const AuthContext = createContext(null);
+const API_URL = import.meta.env.VITE_BACKEND_URL;
 
 // Mock user storage - replace with your backend API calls
 const STORAGE_KEY = 'risksense_user';
@@ -9,7 +10,6 @@ const STORAGE_KEY = 'risksense_user';
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-
   useEffect(() => {
     // Check for existing session on mount
     const storedUser = localStorage.getItem(STORAGE_KEY);
@@ -23,7 +23,7 @@ export const AuthProvider = ({ children }) => {
     // TODO: Replace with your backend API call
     // Example: const response = await fetch('/api/auth/signup', { method: 'POST', body: JSON.stringify({ email, password, full_name }) });
     
-      const res = await fetch("http://127.0.0.1:8000/api/v1/users/" , {
+      const res = await fetch(`${API_URL}/api/v1/users/` , {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -47,7 +47,7 @@ export const AuthProvider = ({ children }) => {
   const signIn = async (email, password) => {
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/v1/users/login" , {
+      const res = await fetch(`${API_URL}/api/v1/users/login` , {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

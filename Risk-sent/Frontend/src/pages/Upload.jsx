@@ -10,6 +10,8 @@ export default function Upload() {
   const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
 
+  const API_URL = import.meta.env.VITE_BACKEND_URL;
+
   const handleDragOver = useCallback((e) => {
     e.preventDefault();
     setIsDragging(true);
@@ -74,7 +76,7 @@ export default function Upload() {
         const formData = new FormData();
         formData.append("file", fileItem.file); // 🔑 key = "file"
   
-        const response = await fetch("http://127.0.0.1:8000/api/v1/uploads", {
+        const response = await fetch(`${API_URL}/api/v1/uploads/`, {
           method: "POST",
           body: formData,
           credentials : "include"

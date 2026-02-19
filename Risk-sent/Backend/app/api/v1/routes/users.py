@@ -29,7 +29,19 @@ async def login_user(response: Response, data: UserCreate):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
     token = create_access_token(str(user.get("_id")))
     # set cookie — in production set secure=True and samesite properly
-    response.set_cookie(key="token", value=token, httponly=True, samesite="none" , secure=True ,  path="/" , max_age=60*60*24)
+    response.set_cookie(
+        key="token", 
+        value=token, 
+        httponly=True, 
+        samesite="none", 
+        secure=True, 
+        path="/", 
+        max_age=60*60*24
+    )
+    cookie_header = response.headers.get("set-cookie")
+    if cookie_header:
+        response.headers["set-cookie"] = f"{cookie_header}; Partitioned"
+        print("Partitioned cookie set successfully.")
     return {"full_name" : user["full_name"] , "email" : user["email"]}
 
 

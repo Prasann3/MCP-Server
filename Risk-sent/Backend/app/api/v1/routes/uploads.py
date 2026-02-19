@@ -66,7 +66,7 @@ async def upload_new_document(
           f.write(await file.read())
 
         # 6. Insert into MongoDB
-        linux_file_path = f"/mnt/c/Users/Lenovo/OneDrive/Desktop/DE Shaw/Risk-sent/Backend/app/uploads/pdfs/{unique_id}.pdf"
+        linux_file_path = f"/app/app/uploads/pdfs/{unique_id}.pdf"
         await mongo_client.db.document.insert_one(document)
         document["_id"] = str(document["_id"])
         job_id = str(uuid4())

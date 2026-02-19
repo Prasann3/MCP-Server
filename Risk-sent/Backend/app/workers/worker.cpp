@@ -6,7 +6,7 @@
 #include <condition_variable>
 #include <queue>
 #include <cstdint>
-#include "json.hpp"
+#include <nlohmann/json.hpp>
 #include <poppler/cpp/poppler-document.h>
 #include <poppler/cpp/poppler-page.h>
 #include "spdlog/spdlog.h"

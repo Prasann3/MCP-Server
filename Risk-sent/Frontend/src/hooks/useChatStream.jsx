@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+const API_URL = import.meta.env.VITE_BACKEND_URL;
+
 export const useChatStream = () => {
   const [messages, setMessages] = useState([]);
   const [currentStep, setCurrentStep] = useState(0);
@@ -22,7 +24,7 @@ export const useChatStream = () => {
     
     try {
       if(!currentChatId) {
-             const res = await fetch(`http://127.0.0.1:8000/api/v1/chats/` , {
+             const res = await fetch(`${API_URL}/api/v1/chats/` , {
                     method : 'POST' ,
                     credentials : "include" ,
                     headers: { 'Content-Type': 'application/json' },
@@ -36,7 +38,7 @@ export const useChatStream = () => {
         role : "user" , content: input  
       }
       if(currentDocumentId)body.doc_id = currentDocumentId
-      const response = await fetch(`http://127.0.0.1:8000/api/v1/chats/${currentChatId}/messages`, {
+      const response = await fetch(`${API_URL}/api/v1/chats/${currentChatId}/messages`, {
         method: 'POST',
         credentials : "include",
         headers: { 'Content-Type': 'application/json' },
@@ -89,7 +91,7 @@ export const useChatStream = () => {
         });
       }
       if(fetchChat) {
-        const res = await fetch(`http://127.0.0.1:8000/api/v1/chats/${currentChatId}` , {
+        const res = await fetch(`${API_URL}/api/v1/chats/${currentChatId}` , {
           method : 'GET' ,
           credentials : "include"
         })
