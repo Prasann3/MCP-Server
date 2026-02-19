@@ -40,6 +40,7 @@ graph TD
     B -->|Query| I[Agent Manager]
     I <--> J[MCP Server Tools]
     J -->|Semantic Search| H
+    K[LLM] <--> I
 ```
 
 ### ⚡ High-Performance C++ Bridge
