@@ -27,6 +27,9 @@ export default function Auth() {
 
     try {
       if (isLogin) {
+        if (formData.password.length < 6) {
+          throw new Error('Password must be at least 6 characters long');
+        }
         const {user , error } = await signIn(formData.email, formData.password);
         if (error) throw error;
         if(user) {
@@ -34,6 +37,9 @@ export default function Auth() {
         navigate('/dashboard');
         }
       } else {
+        if (formData.password.length < 6) {
+          throw new Error('Password must be at least 6 characters long');
+        }
         const { error } = await signUp(formData.email, formData.password, formData.full_name);
         if (error) throw error;
         toast({ title: 'Account created!', description: 'You can now sign in.' });

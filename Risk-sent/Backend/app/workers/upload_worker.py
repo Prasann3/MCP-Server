@@ -1,6 +1,9 @@
 import asyncio
 import json
 import time
+import os
+import signal
+import sys
 from app.services.redis import redis_client
 from app.core.logging import logging
 from app.db.client import mongo_client
@@ -10,7 +13,8 @@ from bson import ObjectId
 from pymongo import InsertOne, UpdateOne
 
 ## Setting up logger
-logger = logging.getLogger(__name__)
+my_pid = os.getpid()
+logger = logging.getLogger(f"upload_worker_{my_pid}")
 
 class UploadWorker:
     def __init__(self, queue_name):
@@ -18,10 +22,20 @@ class UploadWorker:
         self.running = True
         self.db = None
         self.MAX_JOB = 8
+        self.active_tasks = set() # Track background tasks
+
+    def handle_exit_signal(self , signum, frame):
+            """Triggered when Autoscaler calls proc.terminate()"""
+            logger.info(f"Termination signal received ({signum}) . Finishing current job...")
+            self.running = False
+     
 
     async def start(self):
         # 1. Connect to Redis and DB
+
         try:
+            signal.signal(signal.SIGTERM, self.handle_exit_signal)
+            signal.signal(signal.SIGINT, self.handle_exit_signal)
             self.redis = redis_client
             await mongo_client.connect()
             self.db = mongo_client.db
@@ -39,7 +53,14 @@ class UploadWorker:
 
             await self._redis_worker_loop()
         except Exception as e: 
-            logger.error(f"Error occurred during starting the worker: {str(e)}")    
+            logger.error(f"Error occurred during starting the worker: {str(e)}")   
+
+        finally:
+            # CLEANUP PHASE: This runs after self.running is False
+            if self.active_tasks:
+                logger.info(f"Waiting for {len(self.active_tasks)} jobs to finish...")
+                await asyncio.gather(*self.active_tasks) 
+            logger.info("All jobs finished. Cleanup complete.")     
 
     async def _redis_worker_loop(self):
         """Pulls jobs from Redis and handles them concurrently."""
@@ -48,6 +69,7 @@ class UploadWorker:
             while self.running:
                 while self.MAX_JOB <= 0:
                     await asyncio.sleep(2)
+                    continue
                 
                 # Long-poll Redis
                 result = await self.redis.brpop(self.queue_name, timeout=2)
@@ -57,7 +79,11 @@ class UploadWorker:
 
                     # Manage concurrency
                     self.MAX_JOB -= 1
-                    asyncio.create_task(self._process_job(job_data))
+                    task = asyncio.create_task(self._process_job(job_data))
+                    self.active_tasks.add(task)
+                    task.add_done_callback(self.active_tasks.discard)
+
+            logger.info("Loop stopped. No longer taking new jobs.")       
                     
         except Exception as e:
             logger.error(f"Redis Loop Error: {e}")
@@ -192,6 +218,7 @@ async def main():
         pass
     finally:
         worker.stop()
+        logger.info("Worker stopped")
 
 if __name__ == "__main__":
     asyncio.run(main())

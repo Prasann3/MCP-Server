@@ -42,7 +42,7 @@ RUN python3 -m pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # 6. Compile the C++ worker
-RUN g++ -O3 -o worker app/workers/worker.cpp \
+RUN g++ -O3 -o app/workers/worker app/workers/worker.cpp \
     -DSPDLOG_FMT_EXTERNAL \
     -lpoppler-cpp -lspdlog -lfmt -lpthread \
     -Wl,-rpath,/usr/local/lib:/usr/lib

@@ -12,6 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from bson import ObjectId
 from app.services.redis import redis_client
+from app.core.config import settings
 import json
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -66,7 +67,7 @@ async def upload_new_document(
           f.write(await file.read())
 
         # 6. Insert into MongoDB
-        linux_file_path = f"/app/app/uploads/pdfs/{unique_id}.pdf"
+        linux_file_path = f"{settings.WORKING_DIR}/app/uploads/pdfs/{unique_id}.pdf"
         await mongo_client.db.document.insert_one(document)
         document["_id"] = str(document["_id"])
         job_id = str(uuid4())
@@ -74,7 +75,8 @@ async def upload_new_document(
             "job_id" : job_id ,
             "doc_id" : document["_id"] ,
             "file_path" : str(linux_file_path) ,
-            "user_id" : user_id
+            "user_id" : user_id ,
+            "filename" : str(unique_id)
         }
         await redis_client.lpush("parse_queue" , json.dumps(job_payload))
 

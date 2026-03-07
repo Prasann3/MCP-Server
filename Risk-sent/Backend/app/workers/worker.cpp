@@ -128,7 +128,7 @@ int main() {
 
     spdlog::info("C++ Process started");
 
-    const int num_threads = thread::hardware_concurrency();
+    const int num_threads = 4; //Value 4 is fixed
     vector<thread> workers;
 
     for (int i = 0; i < num_threads; ++i) {

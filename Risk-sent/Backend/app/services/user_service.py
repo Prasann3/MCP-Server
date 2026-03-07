@@ -4,12 +4,14 @@ from app.schemas.user_schema import UserCreate, UserInDB, UserOut, UserUpdate
 from app.utils.hash import hash_password, verify_password
 from bson import ObjectId
 
+async def user_already_exist(email) :
+    users = mongo_client.db.users
+    existing = await users.find_one({"email": email})
+    if existing :  return True
+    else : return False
 
 async def create_user(user: UserCreate) -> dict:
     users = mongo_client.db.users
-    existing = await users.find_one({"email": user.email})
-    if existing:
-        raise ValueError("User with that email already exists")
     hashed = hash_password(user.password)
     doc = {"email": user.email, "full_name": user.full_name, "hashed_password": hashed}
     print(doc["full_name"])

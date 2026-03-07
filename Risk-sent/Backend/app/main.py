@@ -34,22 +34,20 @@ async def lifespan(app: FastAPI):
     if postman_socket is None :
         logger.error("Cant connect to postman")
 
-    listener = subprocess.Popen(
-        [interpreter , "-m" , "app.services.listener"] ,
+    autoscaler = subprocess.Popen(
+        [interpreter , "-m" , "app.services.autoscaler"] ,
         stdout=None,  
         stderr=None,
     )
 
+    monitorer = subprocess.Popen(
+        [interpreter , "-m" , "app.services.monitorer"] ,
+        stdout=None,  
+        stderr=None,
+    )
+    
     await asyncio.sleep(1)
     
-    message = {
-        "from" : "FAST_API" ,
-        "to" : "listener" ,
-        "type" : "message" ,
-        "payload" : "Hello"
-    }
-    data_to_send = (json.dumps(message) + "\n").encode('utf-8')
-    postman_socket.sendall(data_to_send)
 
     yield # The app stays here while running
     
@@ -58,6 +56,13 @@ async def lifespan(app: FastAPI):
     await agent_manager.shutdown()
     await mongo_client.close()
     postman_service.terminate()
+    postman_service.wait(timeout=10) # Ensure Postman has fully terminated before proceeding
+    autoscaler.terminate()
+    autoscaler.wait(timeout=10) # Ensure Autoscaler has fully terminated before proceeding
+    # listener.terminate()
+    # listener.wait(timeout=10) # Ensure Listener has fully terminated before proceeding
+    monitorer.terminate()
+    monitorer.wait(timeout=10) # Ensure Monitorer has fully terminated before proceeding
     
 
 app = FastAPI(title="Risk-Sensing AI" , lifespan = lifespan)

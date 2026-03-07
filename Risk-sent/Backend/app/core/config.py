@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     ALGORITHM : str = Field(... , env="ALGORITHM")
     SYSTEM_ENV : str = Field(..., env="SYSTEM_ENV")
     REDIS_SERVER_URL : str = Field(... , env="REDIS_SERVER_URL")
+    WORKING_DIR : str = Field(... , env="WORKING_DIR")
+    ENV : str = Field(... , env="ENV")
     EMBEDDING_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
     LLM_REPO_ID: str = "mistralai/Mistral-7B-Instruct-v0.3"
     

@@ -34,6 +34,11 @@ export const AuthProvider = ({ children }) => {
           full_name
         })
       })
+      
+     if (!res.ok) {
+        const errorBody = await res.json().catch(() => null);
+        throw new Error(errorBody?.detail || `HTTP ${res.status}`);
+      }
 
       const data = await res.json()      
       const user = {

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from app.schemas.user_schema import UserCreate, UserOut, UserUpdate, Token
-from app.services.user_service import create_user, authenticate_user, get_user_by_id, list_users, update_user, delete_user
+from app.services.user_service import create_user, authenticate_user, get_user_by_id, list_users, update_user, delete_user , user_already_exist
 from app.core.auth import create_access_token, get_current_user
 from typing import List
 from app.core.logging import logger
@@ -10,14 +10,38 @@ from bson import ObjectId
 router = APIRouter()
 
 
-@router.post("/", response_model=UserOut)
-async def register_user(data: UserCreate):
+@router.post("/")
+async def register_user(response: Response , data: UserCreate):
     try:
+        if await user_already_exist(data.email) :
+            logger.warning(f"Registration attempt with existing email: {data.email}")
+            user = await authenticate_user(data.email , data.password)
+            if not user :
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User Already exists but Invalid credentials provided")
+            
+
+            token = create_access_token(str(user.get("_id")))
+            # set cookie — in production set secure=True and samesite properly
+            response.set_cookie(
+                key="token", 
+                value=token, 
+                httponly=True, 
+                samesite="none", 
+                secure=True, 
+                path="/", 
+                max_age=60*60*24
+            )
+            cookie_header = response.headers.get("set-cookie")
+            if cookie_header:
+                response.headers["set-cookie"] = f"{cookie_header}; Partitioned"
+                print("Partitioned cookie set successfully.")
+            return {"full_name" : user["full_name"] , "email" : user["email"] , "_id" : str(user["_id"])}
+        
         created = await create_user(data)
         created["_id"] = str(created["_id"])
         return created
     except ValueError as e:
-        logger.error(e.with_traceback())
+        logger.error(str(e))
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
